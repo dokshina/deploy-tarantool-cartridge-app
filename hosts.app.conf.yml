@@ -1,0 +1,106 @@
+---
+all:
+  vars:
+    # common cluster variables
+    cartridge_app_name: getting-started-app
+    # cartridge_package_path: ./getting-started-app-1.0.0-0.rpm  # path to package
+
+    cartridge_cluster_cookie: app-default-cookie  # cluster cookie
+
+    cartridge_bootstrap_vshard: true
+    cartridge_failover: true
+
+    cartridge_auth:
+      enabled: true
+
+      users:
+        - username: Elizaveta
+          password: ilovetarantool
+          # deleted: true
+
+    cartridge_app_config:
+      section-1:
+        body: cartridge-one-love
+        # deleted: true
+
+      section-2:
+        body:
+          key: value
+          # key-2: value-2
+
+    # common ssh options
+    ansible_ssh_private_key_file: ~/.vagrant.d/insecure_private_key
+    ansible_ssh_common_args: '-o IdentitiesOnly=yes -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'
+
+  # INSTANCES
+  hosts:
+    storage-1:
+      config:
+        advertise_uri: '172.19.0.2:3301'
+        http_port: 8181
+
+    app-1:
+      config:
+        advertise_uri: '172.19.0.3:3301'
+        http_port: 8182
+
+    storage-1-replica:
+      config:
+        advertise_uri: '172.19.0.3:3302'
+        http_port: 8183
+      # expelled: true
+
+    storage-1-replica-2:
+      config:
+        advertise_uri: '172.19.0.2:3302'
+        http_port: 8184
+
+  children:
+    # GROUP INSTANCES BY MACHINES
+    host1:
+      vars:
+        # first machine connection options
+        ansible_host: 172.19.0.2
+        ansible_user: vagrant
+
+      hosts:  # instances to be started on the first machine
+        storage-1:
+        storage-1-replica-2:
+
+    host2:
+      vars:
+        # second machine connection options
+        ansible_host: 172.19.0.3
+        ansible_user: vagrant
+
+      hosts:  # instances to be started on the second machine
+        app-1:
+        storage-1-replica:
+
+    # GROUP INSTANCES BY REPLICA SETS
+    replicaset_app_1:  # replica set app-1 (api)
+      vars:
+        replicaset_alias: app-1-replicaset
+        failover_priority:
+          - app-1
+        roles:
+          - api
+
+      hosts:
+        app-1:
+
+    replicaset_storage_1:  # replica set storage-1 (storage)
+      vars:
+        replicaset_alias: storage-1-replicaset
+        failover_priority:
+          - storage-1
+          - storage-1-replica
+        roles:
+          - storage
+        weight: 2
+        all_rw: true
+
+      hosts:
+        storage-1:
+        storage-1-replica:
+        storage-1-replica-2:

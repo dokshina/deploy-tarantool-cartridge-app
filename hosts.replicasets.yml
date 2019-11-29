@@ -3,7 +3,7 @@ all:
   vars:
     # common cluster variables
     cartridge_app_name: getting-started-app
-    cartridge_package_path: ./getting-started-app-1.0.0-0.rpm  # path to package
+    # cartridge_package_path: ./getting-started-app-1.0.0-0.rpm  # path to package
 
     cartridge_cluster_cookie: app-default-cookie  # cluster cookie
 
@@ -27,6 +27,12 @@ all:
       config:
         advertise_uri: '172.19.0.3:3302'
         http_port: 8183
+      # expelled: true
+
+    storage-1-replica-2:
+      config:
+        advertise_uri: '172.19.0.2:3302'
+        http_port: 8184
 
   children:
     # GROUP INSTANCES BY MACHINES
@@ -38,6 +44,7 @@ all:
 
       hosts:  # instances to be started on the first machine
         storage-1:
+        storage-1-replica-2:
 
     host2:
       vars:
@@ -48,3 +55,31 @@ all:
       hosts:  # instances to be started on the second machine
         app-1:
         storage-1-replica:
+
+    # GROUP INSTANCES BY REPLICA SETS
+    replicaset_app_1:  # replica set app-1 (api)
+      vars:
+        replicaset_alias: app-1-replicaset
+        failover_priority:
+          - app-1
+        roles:
+          - api
+
+      hosts:
+        app-1:
+
+    replicaset_storage_1:  # replica set storage-1 (storage)
+      vars:
+        replicaset_alias: storage-1-replicaset
+        failover_priority:
+          - storage-1
+          - storage-1-replica
+        roles:
+          - storage
+        weight: 2
+        all_rw: true
+
+      hosts:
+        storage-1:
+        storage-1-replica:
+        storage-1-replica-2:
