@@ -1,0 +1,125 @@
+---
+all:
+  vars:
+    # common cluster variables
+    cartridge_app_name: getting-started-app
+    cartridge_package_path: ./getting-started-app-2.0.0-0.rpm  # <==
+    cartridge_enable_tarantool_repo: false  # <==
+
+    cartridge_cluster_cookie: app-default-cookie  # cluster cookie
+    cartridge_bootstrap_vshard: true  # <==
+    cartridge_failover: true  # <==
+
+    # authorization
+    cartridge_auth:  # <==
+      enabled: true   # enable authorization
+      cookie_max_age: 1000
+      cookie_renew_age: 100
+
+      users:  # cartridge users to set up
+        - username: dokshina
+          password: cartridge-rullez
+          fullname: Elizaveta Dokshina
+          email: dokshina@example.com
+          # deleted: true  # uncomment to delete user
+
+    # cluster-wide config
+    cartridge_app_config:  # <==
+      max-balance:  # section name
+        body: 1000000  # section body
+        # deleted: true  # uncomment to delete section max-balance
+
+    # common ssh options
+    ansible_ssh_private_key_file: ~/.vagrant.d/insecure_private_key
+    ansible_ssh_common_args: '-o IdentitiesOnly=yes -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'
+
+  # INSTANCES
+  hosts:
+    storage-1:
+      config:
+        advertise_uri: '172.19.0.2:3301'
+        http_port: 8181
+
+    app-1:
+      config:
+        advertise_uri: '172.19.0.3:3301'
+        http_port: 8182
+
+    storage-1-replica:
+      config:
+        advertise_uri: '172.19.0.3:3302'
+        http_port: 8183
+
+    storage-2:
+      config:
+        advertise_uri: '172.19.0.3:3303'
+        http_port: 8184
+      expelled: true  # <==
+
+    storage-2-replica:
+      config:
+        advertise_uri: '172.19.0.2:3302'
+        http_port: 8185
+      expelled: true  # <==
+
+  children:
+    # GROUP INSTANCES BY MACHINES
+    host1:
+      vars:
+        # first machine connection options
+        ansible_host: 172.19.0.2
+        ansible_user: vagrant
+
+      hosts:  # instances to be started on the first machine
+        storage-1:
+        storage-2-replica:
+
+    host2:
+      vars:
+        # second machine connection options
+        ansible_host: 172.19.0.3
+        ansible_user: vagrant
+
+      hosts:  # instances to be started on the second machine
+        app-1:
+        storage-1-replica:
+        storage-2:
+
+    # GROUP INSTANCES BY REPLICA SETS
+    replicaset_app_1:
+      vars:  # replica set configuration
+        replicaset_alias: app-1
+        failover_priority:
+          - app-1  # leader
+        roles:
+          - 'api'
+
+      hosts:  # replica set instances
+        app-1:
+
+    replicaset_storage_1:
+      vars:  # replica set configuration
+        replicaset_alias: storage-1
+        weight: 3
+        failover_priority:
+          - storage-1  # leader
+          - storage-1-replica
+        roles:
+          - 'storage'
+
+      hosts:   # replica set instances
+        storage-1:
+        storage-1-replica:
+
+    replicaset_storage_2:
+      vars:  # replicaset configuration
+        replicaset_alias: storage-2
+        weight: 0  # <==
+        failover_priority:
+          - storage-2
+        roles:
+          - 'storage'
+
+      hosts:  # replicaset instances
+        storage-2:
+        storage-2-replica:
